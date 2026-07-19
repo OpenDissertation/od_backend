@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "od-backend"
+name = "od_backend"
 dynamic = ["version"]
 description = "Back-end source code for opendissertation.com"
 readme = "README.md"
@@ -42,14 +42,14 @@ dev = [
 
 [project.urls]
 Homepage = "https://opendissertation.com"
-Repository = "https://github.com/OpenDissertation/od-backend"
-Issues = "https://github.com/OpenDissertation/od-backend/issues"
+Repository = "https://github.com/OpenDissertation/od_backend"
+Issues = "https://github.com/OpenDissertation/od_backend/issues"
 
 [tool.hatch.version]
-path = "src/od-backend/__init__.py"
+path = "src/od_backend/__init__.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/od-backend"]
+packages = ["src/od_backend"]
 
 [tool.mypy]
 files = ["."]
