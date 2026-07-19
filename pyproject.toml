@@ -1,17 +1,103 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "od-backend"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Back-end source code for opendissertation.com"
 readme = "README.md"
 requires-python = ">=3.14"
+license = { text = "MIT" }
+authors = [
+    { name = "Jeffry Lew", email = "jeffryklew@gmail.com" },
+    { name = "Seong Oh", email = "soh4320@gmail.com" },
+]
+keywords = ["dissertation", "openai", "publication"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+    "License :: OSI Approved :: MIT License",
+]
 dependencies = [
     "fastapi>=0.139.2",
     "httpx>=0.28.1",
     "logging>=0.4.9.6",
-    "mypy>=2.3.0",
     "openai>=2.46.0",
     "pydantic>=2.13.4",
-    "pytest>=9.1.1",
-    "ruff>=0.15.22",
     "uvicorn>=0.51.0",
+]
+
+[dependency-groups]
+lint = ["ruff"]
+type-check = ["mypy"]
+test = ["pytest"]
+dev = [
+    "pre-commit",
+    { include-group = "lint" },
+    { include-group = "type-check" },
+    { include-group = "test" },
+]
+
+[project.urls]
+Homepage = "https://opendissertation.com"
+Repository = "https://github.com/OpenDissertation/od-backend"
+Issues = "https://github.com/OpenDissertation/od-backend/issues"
+
+[tool.hatch.version]
+path = "src/od-backend/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/od-backend"]
+
+[tool.mypy]
+files = ["."]
+exclude = ["build/"]
+strict = true
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+pythonpath = "src"
+testpaths = [
+    "tests",
+]
+log_cli_level = "INFO"
+
+[tool.ruff]
+target-version = "py314"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    # Formatting ignores
+    "COM812",
+    "COM819",
+    "E501",
+    "ISC001",
+    # Docstring ignores
+    "D203",
+    "D212",
+    "D416",
+    # Preferences
+    "EM101",
+    "EM102",
+    "FIX002",
+    "PLR0911",
+    "PLR0912",
+    "PLR0915",
+    "PTH123",
+    "TD002",
+    "TRY003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "D1",
+    "INP",
+    "PLR0913",
+    "PLR2004",
+    "S101",
+    "SLF001",
 ]
