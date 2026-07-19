@@ -1,0 +1,17 @@
+services:
+  od_backend:
+    build: .
+    command: ["uvicorn", "od_backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    environment:
+      CONFIG_TOML_FILE: /run/secrets/config_toml
+    restart: always
+    secrets:
+      - config_toml
+    volumes:
+      - ./src:/usr/src/app
+    ports:
+      - 8000:8000
+
+secrets:
+  config_toml:
+    file: config.toml

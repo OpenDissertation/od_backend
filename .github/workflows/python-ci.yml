@@ -1,0 +1,42 @@
+name: PythonCI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  ci:
+    name: CodeQualityAndTests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: CheckoutRepo
+        uses: actions/checkout@v4
+
+      - name: SetUpUV
+        uses: astral-sh/setup-uv@v5
+        with:
+          # Speeds up consecutive runs by caching the uv store
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: SetUpPython
+        # Automatically installs the version defined in pyproject.toml
+        run: uv python install
+
+      - name: InstallDeps
+        run: uv sync --all-extras --dev
+
+      - name: CheckFormatting
+        run: uv run ruff format --check
+
+      - name: LintCode
+        run: uv run ruff check
+
+      - name: CheckTypes
+        run: uv run mypy
+
+      - name: RunTests
+        run: uv run pytest
