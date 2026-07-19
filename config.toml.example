@@ -1,0 +1,6 @@
+# TOML explained at https://toml.io/en/
+
+title = "TOML Config for OpenAI"
+
+[OPENAI_DEV]
+OPENAI_API_KEY = "openai_api_key"
