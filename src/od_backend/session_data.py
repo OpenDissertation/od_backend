@@ -56,6 +56,20 @@ class ChatResponse(BaseModel):
     previous_response_id: str
 
 
+"""
+In-memory session store. Replace with a Redis instance later.
+
+Structure:
+{
+    session_id: {
+        "file_ids": list[str],
+        "previous_response_id": str | None,
+    }
+}
+"""
+SESSION_DB: dict[str, dict[str, list[str] | str | None]] = {}
+
+
 def add(lhs: int, rhs: int) -> int:
     """
     Test function that adds two integers.
