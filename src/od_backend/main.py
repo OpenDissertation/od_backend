@@ -1,9 +1,35 @@
 """Defines endpoints for file processing and chatting with OpenAI Chat-GPT."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
+
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    """
+    Initialize FastAPI with a lifespan event to manage the async HTTP client.
+
+    Attributes
+    ----------
+    app: The FastAPI object to initialize.
+
+    """
+    # Initialize the global async HTTPX client on startup
+    app.state.http_client = httpx.AsyncClient()
+    yield
+
+    # Clean up the client on shutdown
+    await app.state.http_client.aclose()
+
 
 app = FastAPI(
     title="OpenDissertation",
