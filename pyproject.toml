@@ -1,0 +1,9 @@
+[project]
+name = "od-backend"
+version = "0.1.0"
+description = "Back-end source code for opendissertation.com"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "ruff>=0.15.22",
+]
