@@ -5,13 +5,19 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import httpx
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from od_backend.configure_openai import initialize_openai
+from openai import AsyncOpenAI
 
 from . import __version__
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
@@ -47,7 +53,6 @@ app = FastAPI(
     },
 )
 
-
 # Needed so FastAPI server can accept forwarded requests in production
 app.add_middleware(
     CORSMiddleware,
@@ -56,6 +61,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Initialize the asynchronous OpenAI client
+openai_client: AsyncOpenAI = initialize_openai()
 
 
 @app.get("/api/v1/contact")
