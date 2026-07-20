@@ -2,19 +2,21 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 import httpx
-import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from od_backend.configure_openai import initialize_openai
-from openai import AsyncOpenAI
 
 from . import __version__
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+
+    from openai import AsyncOpenAI
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
