@@ -20,14 +20,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class InitSessionRequest(BaseModel):
+class UploadFilesRequest(BaseModel):
     """
-    Stores the list of files needed to initialize an OpenAI Chat session.
+    Stores the list of files to upload at the start of an OpenAI Chat session.
 
     Attributes
     ----------
     session_id: The OpenAI session ID.
-    file_paths: The list of file paths to initialize the OpenAI client.
+    file_paths: The list of file paths to upload to the OpenAI client.
 
     """
 
