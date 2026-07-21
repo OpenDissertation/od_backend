@@ -55,4 +55,4 @@ LABEL org.opencontainers.image.vendor="OpenDissertation"
 
 LABEL org.opencontainers.image.version="0.2.0"
 
-CMD ["uvicorn", "od_backend.main:app", "--host", "0.0.0.0", "--port", "${PORT:-8000}"]
+CMD ["sh", "-c", "uvicorn od_backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
