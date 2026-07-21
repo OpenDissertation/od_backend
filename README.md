@@ -62,6 +62,10 @@ Once you are done with development, shut down the server with
 $ docker-compose down
 ```
 
+Any changes that are pushed to GitHub will trigger a deployment to Google Cloud
+Run. Jeffry used the following reference to set up the link between GitHub and
+Cloud Run: https://docs.cloud.google.com/run/docs/quickstarts/deploy-continuously#cloudrun_deploy_continuous_code-python
+
 ### Production
 
 An `OPENAI_API_KEY` environment variable needs to be defined in the production
