@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 # Define the OpenAI model to use.
-OPENAI_MODEL: str = "gpt-5.6"
+OPENAI_MODEL: str = "gpt-5.6-luna"
 
 
 def _initialize_credentials() -> None:
