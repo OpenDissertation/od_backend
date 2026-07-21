@@ -113,12 +113,13 @@ def author_matches(author: str, repository_authors: list[str]) -> bool:
     requested = author.casefold().replace(",", " ")
     requested_parts = {part for part in re.split(r"\s+", requested) if part}
     surname = author_surname(author)
+    allow_surname_only = len(requested_parts) == 1 and surname in requested_parts
     for repo_author in repository_authors:
         repo = repo_author.casefold().replace(",", " ")
         repo_parts = {part for part in re.split(r"\s+", repo) if part}
         if requested_parts and requested_parts.issubset(repo_parts):
             return True
-        if surname and surname in repo_parts:
+        if allow_surname_only and surname and surname in repo_parts:
             return True
     return False
 

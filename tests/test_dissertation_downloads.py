@@ -27,6 +27,11 @@ def test_author_matches_accepts_comma_and_surname_forms() -> None:
     assert not author_matches("Jane Smith", ["Jane Doe"])
 
 
+def test_author_matches_requires_given_name_for_full_name_requests() -> None:
+    assert not author_matches("Jane Smith", ["John Smith"])
+    assert author_matches("Smith", ["John Smith"])
+
+
 def test_safe_pdf_path_uses_tmp_directory() -> None:
     path = safe_pdf_path("Doe, Jane", "unsw", "A Thesis: With Punctuation!")
     assert path.parent == Path("/") / "tmp"
