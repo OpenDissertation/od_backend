@@ -101,7 +101,7 @@ def author_surname(author: str) -> str:
     """Extract a surname-like token for loose repository result validation."""
     if "," in author:
         return author.split(",", maxsplit=1)[0].strip().casefold()
-    return author.split(maxsplit=1)[0].strip().casefold()
+    return author.rsplit(maxsplit=1)[-1].strip().casefold()
 
 
 def author_matches(author: str, repository_authors: list[str]) -> bool:
