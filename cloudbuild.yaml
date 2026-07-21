@@ -1,0 +1,37 @@
+steps:
+  # The following substitution variables are set in Cloud Build Triggers.
+  # See https://docs.cloud.google.com/build/docs/deploying-builds
+  #     /deploy-cloud-run#building_and_deploying_an_image for details.
+  # - _AR_REGION
+  # - _AR_REPO
+  # - _SERVICE_NAME
+  # - _DEPLOY_REGION
+  #
+  # Step 1: Build the container image using BuildKit
+  - name: 'gcr.io/cloud-builders/docker'
+    env:
+      - 'DOCKER_BUILDKIT=1'
+    args: [
+      'build', 
+      '-t', '${_AR_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE_NAME}:$COMMIT_SHA',
+      '--build-arg', 'BUILDKIT_INLINE_CACHE=1', # Encourages build caching
+      '.'
+    ]
+
+  # Step 2: Push the compiled image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '${_AR_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE_NAME}:$COMMIT_SHA']
+
+  # Step 3: Deploy the built image to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_SERVICE_NAME}'
+      - '--image=${_AR_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE_NAME}:$COMMIT_SHA'
+      - '--region=${_DEPLOY_REGION}'
+      - '--allow-unauthenticated'
+
+images:
+  - '${_AR_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE_NAME}:$COMMIT_SHA'
