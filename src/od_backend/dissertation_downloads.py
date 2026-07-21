@@ -91,7 +91,9 @@ def normalize_institution(institution: str) -> str:
 def safe_pdf_path(author: str, institution_key: str, title: str | None) -> Path:
     """Build a deterministic, filesystem-safe /tmp PDF path."""
     name_source = title or author or "dissertation"
-    safe_author = re.sub(r"[^\w\-\s,]", "", author).strip().replace(" ", "_").replace(",", "")
+    safe_author = (
+        re.sub(r"[^\w\-\s,]", "", author).strip().replace(" ", "_").replace(",", "")
+    )
     safe_title = re.sub(r"[^\w\-\s]", "", name_source)[:80].strip().replace(" ", "_")
     filename = f"od_{institution_key}_{safe_author}_{safe_title}.pdf"
     return DOWNLOAD_DIRECTORY / filename
@@ -174,7 +176,9 @@ def get_princeton_item_metadata(page: Page, item_url: str) -> dict[str, Any]:
     }
 
 
-def download_princeton_pdf(page: Page, pdf_url: str, dest_path: Path, referer: str) -> None:
+def download_princeton_pdf(
+    page: Page, pdf_url: str, dest_path: Path, referer: str
+) -> None:
     """Download a Princeton PDF through Playwright browser navigation."""
     response_holder: dict[str, Response] = {}
 
@@ -215,7 +219,11 @@ def download_princeton_dissertation(author: str) -> DownloadedDissertation:
             "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
         )
         try:
-            page.goto(build_princeton_search_url(author), wait_until="networkidle", timeout=30_000)
+            page.goto(
+                build_princeton_search_url(author),
+                wait_until="networkidle",
+                timeout=30_000,
+            )
             soup = BeautifulSoup(page.content(), "html.parser")
             results_table = next(
                 (
@@ -229,7 +237,12 @@ def download_princeton_dissertation(author: str) -> DownloadedDissertation:
                 None,
             )
             if results_table is None:
-                return DownloadedDissertation(author=author, institution="Princeton University", status="not_found", detail="No Princeton search results table found.")
+                return DownloadedDissertation(
+                    author=author,
+                    institution="Princeton University",
+                    status="not_found",
+                    detail="No Princeton search results table found.",
+                )
             seen: set[str] = set()
             for link in results_table.find_all("a", href=True):
                 href = cast("str", link["href"])
@@ -241,7 +254,9 @@ def download_princeton_dissertation(author: str) -> DownloadedDissertation:
                 seen.add(item_url)
                 item = get_princeton_item_metadata(page, item_url)
                 material_type = (item["material_type"] or "").casefold()
-                if not item["is_thesis"] or not ("ph.d" in material_type or "phd" in material_type):
+                if not item["is_thesis"] or not (
+                    "ph.d" in material_type or "phd" in material_type
+                ):
                     continue
                 if not author_matches(author, item["authors"]):
                     continue
@@ -249,10 +264,22 @@ def download_princeton_dissertation(author: str) -> DownloadedDissertation:
                     continue
                 dest_path = safe_pdf_path(author, "princeton", item["title"])
                 download_princeton_pdf(page, item["pdf_url"], dest_path, item_url)
-                return DownloadedDissertation(author=author, institution="Princeton University", status="downloaded", file_path=str(dest_path), title=item["title"], source_url=item_url)
+                return DownloadedDissertation(
+                    author=author,
+                    institution="Princeton University",
+                    status="downloaded",
+                    file_path=str(dest_path),
+                    title=item["title"],
+                    source_url=item_url,
+                )
         finally:
             browser.close()
-    return DownloadedDissertation(author=author, institution="Princeton University", status="not_found", detail="No downloadable Princeton PhD dissertation found for author.")
+    return DownloadedDissertation(
+        author=author,
+        institution="Princeton University",
+        status="not_found",
+        detail="No downloadable Princeton PhD dissertation found for author.",
+    )
 
 
 def httpx_get_with_retry(
@@ -278,53 +305,92 @@ def httpx_get_with_retry(
     raise last_err
 
 
-def extract_unsw_metadata(metadata: dict[str, list[dict[str, Any]]], keywords: tuple[str, ...]) -> list[str]:
+def extract_unsw_metadata(
+    metadata: dict[str, list[dict[str, Any]]], keywords: tuple[str, ...]
+) -> list[str]:
     """Extract DSpace metadata values whose key contains one of the keywords."""
     values: list[str] = []
     for key, entries in metadata.items():
         if any(keyword in key.casefold() for keyword in keywords):
-            values.extend(str(entry["value"]) for entry in entries if entry.get("value"))
+            values.extend(
+                str(entry["value"]) for entry in entries if entry.get("value")
+            )
     return values
 
 
 def find_unsw_pdf(client: httpx.Client, uuid: str) -> tuple[str | None, str | None]:
     """Find a downloadable ORIGINAL PDF bitstream for a UNSW thesis item."""
-    bundles = httpx_get_with_retry(client, f"{UNSW_API_BASE}/core/items/{uuid}/bundles").json().get("_embedded", {}).get("bundles", [])
+    bundles = (
+        httpx_get_with_retry(client, f"{UNSW_API_BASE}/core/items/{uuid}/bundles")
+        .json()
+        .get("_embedded", {})
+        .get("bundles", [])
+    )
     for bundle in bundles:
         if bundle.get("name") != "ORIGINAL":
             continue
-        bitstreams_url = bundle.get("_links", {}).get("bitstreams", {}).get("href") or f"{UNSW_API_BASE}/core/bundles/{bundle.get('uuid')}/bitstreams"
-        bitstreams = httpx_get_with_retry(client, bitstreams_url).json().get("_embedded", {}).get("bitstreams", [])
+        bitstreams_url = (
+            bundle.get("_links", {}).get("bitstreams", {}).get("href")
+            or f"{UNSW_API_BASE}/core/bundles/{bundle.get('uuid')}/bitstreams"
+        )
+        bitstreams = (
+            httpx_get_with_retry(client, bitstreams_url)
+            .json()
+            .get("_embedded", {})
+            .get("bitstreams", [])
+        )
         for bitstream in bitstreams:
             filename = bitstream.get("name", "")
             if filename.casefold().endswith(".pdf"):
-                return f"{UNSW_BASE_URL}/bitstreams/{bitstream.get('uuid')}/download", filename
+                return (
+                    f"{UNSW_BASE_URL}/bitstreams/{bitstream.get('uuid')}/download",
+                    filename,
+                )
     return None, None
 
 
 def validate_pdf(path: Path) -> None:
     """Reject empty or non-PDF-looking downloads."""
-    if path.stat().st_size < MINIMUM_PDF_BYTES or not path.read_bytes().startswith(b"%PDF"):
+    if path.stat().st_size < MINIMUM_PDF_BYTES or not path.read_bytes().startswith(
+        b"%PDF"
+    ):
         msg = f"Downloaded file does not look like a PDF: {path}"
         raise RuntimeError(msg)
 
 
 def download_unsw_dissertation(author: str) -> DownloadedDissertation:
     """Search UNSWorks and download the first matching dissertation PDF."""
-    headers = {"User-Agent": USER_AGENT, "Accept": "application/json, text/plain, */*", "Referer": f"{UNSW_BASE_URL}/"}
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Accept": "application/json, text/plain, */*",
+        "Referer": f"{UNSW_BASE_URL}/",
+    }
     with httpx.Client(headers=headers, follow_redirects=True) as client:
         search_response = httpx_get_with_retry(
             client,
             f"{UNSW_API_BASE}/discover/search/objects",
-            params={"query": author, "dsoType": "item", "size": 100, "scope": UNSW_THESIS_COLLECTION_UUID},
+            params={
+                "query": author,
+                "dsoType": "item",
+                "size": 100,
+                "scope": UNSW_THESIS_COLLECTION_UUID,
+            },
         )
-        objects = search_response.json().get("_embedded", {}).get("searchResult", {}).get("_embedded", {}).get("objects", [])
+        objects = (
+            search_response.json()
+            .get("_embedded", {})
+            .get("searchResult", {})
+            .get("_embedded", {})
+            .get("objects", [])
+        )
         for obj in objects:
             candidate = obj.get("_embedded", {}).get("indexableObject", {})
             uuid = candidate.get("uuid")
             if not uuid:
                 continue
-            item = httpx_get_with_retry(client, f"{UNSW_API_BASE}/core/items/{uuid}").json()
+            item = httpx_get_with_retry(
+                client, f"{UNSW_API_BASE}/core/items/{uuid}"
+            ).json()
             metadata = item.get("metadata", {})
             authors = extract_unsw_metadata(metadata, ("contributor.author", "creator"))
             if not author_matches(author, authors):
@@ -341,8 +407,20 @@ def download_unsw_dissertation(author: str) -> DownloadedDissertation:
                     for chunk in response.iter_bytes():
                         file_obj.write(chunk)
             validate_pdf(dest_path)
-            return DownloadedDissertation(author=author, institution="University of New South Wales", status="downloaded", file_path=str(dest_path), title=title, source_url=f"{UNSW_BASE_URL}/entities/publication/{uuid}")
-    return DownloadedDissertation(author=author, institution="University of New South Wales", status="not_found", detail="No downloadable UNSW dissertation found for author.")
+            return DownloadedDissertation(
+                author=author,
+                institution="University of New South Wales",
+                status="downloaded",
+                file_path=str(dest_path),
+                title=title,
+                source_url=f"{UNSW_BASE_URL}/entities/publication/{uuid}",
+            )
+    return DownloadedDissertation(
+        author=author,
+        institution="University of New South Wales",
+        status="not_found",
+        detail="No downloadable UNSW dissertation found for author.",
+    )
 
 
 def download_dissertation(query: DissertationQuery) -> DownloadedDissertation:
@@ -354,4 +432,9 @@ def download_dissertation(query: DissertationQuery) -> DownloadedDissertation:
         return download_unsw_dissertation(query.author)
     except Exception as err:
         logger.exception("Failed to download dissertation for %s", query.author)
-        return DownloadedDissertation(author=query.author, institution=query.institution, status="failed", detail=str(err))
+        return DownloadedDissertation(
+            author=query.author,
+            institution=query.institution,
+            status="failed",
+            detail=str(err),
+        )
