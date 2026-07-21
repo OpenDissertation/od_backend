@@ -50,9 +50,9 @@ LABEL org.opencontainers.image.authors="Jeffry Lew"
 LABEL org.opencontainers.image.base.name="python:3.14.6-slim-trixie"
 LABEL org.opencontainers.image.description="Back-end image for opendissertation.com"
 LABEL org.opencontainers.image.source="https://github.com/OpenDissertation/od_backend/blob/main/Dockerfile"
-LABEL org.opencontainers.image.title="od_backend"
+LABEL org.opencontainers.image.title="backend"
 LABEL org.opencontainers.image.vendor="OpenDissertation"
 
-LABEL org.opencontainers.image.version="0.1.0"
+LABEL org.opencontainers.image.version="0.2.0"
 
 CMD ["uvicorn", "od_backend.main:app", "--host", "0.0.0.0", "--port", "${PORT:-8000}"]
