@@ -71,11 +71,18 @@ The production site can be viewed at https://opendissertation.com.
 
 ### Evaluation
 
-We incorporated GPT-5.6 in the multi-turn chat logic, where the user requests it
-to read one or more dissertations and answer questions about them. We decided to
+We incorporated GPT-5.6 Luna in the multi-turn chat logic, where the user asks
+it to download dissertations of requested authors from the currently supported
+institutions of either Princeton University or the University of New South Wales
+ (UNSW), read the dissertations, and answer questions about them. We decided to
 use Codex to build the front-end, as we realized that coding in languages other
 than Python was our weakness and that Codex could accelerate that aspect of our
 hackathon project.
+
+Additionally, @jeffrylew decided to use Codex to integrate @soh4320-dotcom's
+file downloader scripts from https://github.com/OpenDissertation/od-publications
+into https://github.com/OpenDissertation/od_backend. It handled the non-trivial
+merging of logic extremely well and saved time.
 
 Key decisions included:
 
