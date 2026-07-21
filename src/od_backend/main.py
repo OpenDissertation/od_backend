@@ -6,10 +6,17 @@ import logging
 from typing import TYPE_CHECKING
 
 import httpx
-from fastapi import FastAPI
+from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from od_backend.configure_openai import initialize_openai
+from od_backend.session_data import (
+    SESSION_DB,
+    UploadFilesRequest,
+    add_files_to_vector_store,
+    create_vector_store,
+    upload_files_to_openai,
+)
 
 from . import __version__
 
@@ -81,4 +88,55 @@ async def contact() -> dict[str, str]:
     return {
         "name": "Jeffry Lew and Seong Oh",
         "GitHub": "https://github.com/OpenDissertation",
+    }
+
+
+@app.post("/api/v1/session/init", status_code=status.HTTP_201_CREATED)
+async def initialize_vector_store(
+    payload: UploadFilesRequest,
+) -> dict[str, str | list[str]]:
+    """
+    Upload files to OpenAI file storage and initialize the vector store.
+
+    Attributes
+    ----------
+    payload: An UploadFilesRequest containing the session_id and file_paths.
+
+    Returns
+    -------
+    A dict containing the status, session_id, and openai_file_ids.
+
+    """
+    # Upload files to OpenAI file storage
+    uploaded_file_ids: list[str] = await upload_files_to_openai(
+        openai_client, payload.file_paths
+    )
+
+    # Create vector store
+    vector_store_id: str = await create_vector_store(openai_client)
+
+    # Add files to vector store to augment model's knowledge (RAG)
+    await add_files_to_vector_store(
+        openai_client,
+        vector_store_id,
+        uploaded_file_ids,
+    )
+
+    # Commit active tracker state map to database cache
+    SESSION_DB[payload.session_id] = {
+        "file_ids": uploaded_file_ids,
+        "previous_response_id": None,
+    }
+
+    logger.info(
+        "Initialize vector store ID %s with %d files for session ID %s",
+        vector_store_id,
+        len(uploaded_file_ids),
+        payload.session_id,
+    )
+
+    return {
+        "status": "success",
+        "session_id": payload.session_id,
+        "openai_file_ids": uploaded_file_ids,
     }

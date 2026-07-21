@@ -86,8 +86,9 @@ Key decisions included:
     from universities.
   - Jeffry had more experience setting up APIs in prior hackathons, so he worked
     on setting up the structure of the back-end repo.
-- Incorporating the asynchronous OpenAI GPT-5.6 and httpx clients to support
-  uploading and processing dissertations with larger file sizes without freezing
+- Using the asynchronous OpenAI GPT-5.6 client instead of the synchronous client
+  to efficiently upload batches of dissertations to OpenAI file storage and add
+  them to the vector store for Retrieval-Augmented Generation without freezing
   the system.
 
 ### Suggestions
