@@ -21,6 +21,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
 ]
 dependencies = [
+    "anyio>=4.14.2",
     "fastapi>=0.139.2",
     "httpx>=0.28.1",
     "logging>=0.4.9.6",
