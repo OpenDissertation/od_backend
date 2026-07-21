@@ -136,7 +136,7 @@ async def initialize_vector_store(
 
     # Commit active tracker state map to database cache
     SESSION_DB[payload.session_id] = {
-        "file_ids": uploaded_file_ids,
+        "uploaded_file_ids": uploaded_file_ids,
         "vector_store_id": vector_store_id,
         "previous_response_id": None,
     }
