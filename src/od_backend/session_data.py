@@ -13,7 +13,12 @@ if TYPE_CHECKING:
     import os
 
     from openai import AsyncOpenAI
-    from openai.types import FileObject, VectorStore
+    from openai.types import (
+        FileDeleted,
+        FileObject,
+        VectorStore,
+        VectorStoreDeleted,
+    )
     from openai.types.vector_stores import VectorStoreFile, VectorStoreFileBatch
 
 logging.basicConfig(level=logging.INFO)
@@ -275,6 +280,93 @@ async def add_files_to_vector_store(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"OpenAI failed to add files to vector store: {err}",
         ) from err
+
+
+async def delete_vector_store(openai_client: AsyncOpenAI, vector_store_id: str) -> None:
+    """
+    Delete a vector store.
+
+    See https://developers.openai.com/api/reference/python/resources
+    /vector_stores/methods/delete.
+
+    Attributes
+    ----------
+    openai_client: The AsyncOpenAI client to delete the vector store from.
+    vector_store_id: The ID of the vector store to delete.
+
+    Returns
+    -------
+    None.
+
+    Raises
+    ------
+    HTTPException if vector store deletion fails.
+
+    """
+    try:
+        vector_store_deleted: VectorStoreDeleted = (
+            await openai_client.vector_stores.delete(vector_store_id=vector_store_id)
+        )
+
+        logger.info(
+            "%s vector store with ID %s",
+            "Deleted" if vector_store_deleted.deleted else "Did not delete",
+            vector_store_id,
+        )
+    except Exception as err:
+        logger.exception(
+            "OpenAI failed to delete vector store with ID %s", vector_store_id
+        )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"OpenAI VectorStore deletion failed: {err}",
+        ) from err
+
+
+async def delete_files_from_openai(
+    openai_client: AsyncOpenAI, uploaded_file_ids: list[str]
+) -> None:
+    """
+    Delete files from OpenAI file storage.
+
+    See https://developers.openai.com/api/reference/python/resources/files
+    /methods/delete.
+
+    Attributes
+    ----------
+    openai_client: The AsyncOpenAI client to delete files from.
+    uploaded_file_ids: A list of file IDs to delete.
+
+    Returns
+    -------
+    None.
+
+    Raises
+    ------
+    HTTPException if a deletion fails.
+
+    """
+    for file_index, file_id in enumerate(uploaded_file_ids, start=1):
+        try:
+            file_deleted: FileDeleted = await openai_client.files.delete(
+                file_id=file_id
+            )
+
+            logger.info(
+                "%s file %d / %d with ID %s",
+                "Deleted" if file_deleted.deleted else "Did not delete",
+                file_index,
+                len(uploaded_file_ids),
+                file_id,
+            )
+        except Exception as err:
+            logger.exception("OpenAI failed to delete file with ID %s", file_id)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"OpenAI file deletion failed: {err}",
+            ) from err
+
+    logger.info("Successfully deleted %d files", len(uploaded_file_ids))
 
 
 def add(lhs: int, rhs: int) -> int:
