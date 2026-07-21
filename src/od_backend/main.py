@@ -17,6 +17,8 @@ from od_backend.session_data import (
     UploadFilesRequest,
     add_files_to_vector_store,
     create_vector_store,
+    delete_files_from_openai,
+    delete_vector_store,
     upload_files_to_openai,
 )
 
@@ -213,3 +215,41 @@ async def chat_turn(payload: ChatRequest) -> ChatResponse:
         answer=api_response.output_text,
         previous_response_id=api_response.id,
     )
+
+
+@app.delete("/api/v1/session/{session_id}", status_code=status.HTTP_200_OK)
+async def terminate_session(session_id: str) -> dict[str, str]:
+    """
+    Delete the session context and destroy remote OpenAI storage artifacts.
+
+    Attributes
+    ----------
+    session_id: The OpenAI session ID to terminate.
+
+    Returns
+    -------
+    A dict containing the status and detail.
+
+    """
+    session: dict[str, list[str] | str | None] | None = SESSION_DB.pop(session_id, None)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session ID target missing or already cleared.",
+        )
+
+    try:
+        # Unlink structural backend storage assets
+        await delete_vector_store(openai_client, session["vector_store_id"])  # type: ignore[arg-type]
+        await delete_files_from_openai(openai_client, session["uploaded_file_ids"])  # type: ignore[arg-type]
+    except Exception as err:
+        logger.exception("Failed to delete remote OpenAI assets")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Session wiped but remote OpenAI asset deletion failed: {err}",
+        ) from err
+
+    return {
+        "status": "success",
+        "detail": f"Session {session_id} destroyed cleanly.",
+    }
