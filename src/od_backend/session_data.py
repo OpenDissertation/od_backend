@@ -69,7 +69,7 @@ class ChatResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     session_id: str
-    question: str
+    answer: str
     previous_response_id: str
 
 
@@ -79,7 +79,8 @@ In-memory session store. Replace with a Redis instance later.
 Structure:
 {
     session_id: {
-        "file_ids": list[str],
+        "uploaded_file_ids": list[str],
+        "vector_store_id": str,
         "previous_response_id": str | None,
     }
 }

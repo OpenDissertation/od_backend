@@ -6,12 +6,14 @@ import logging
 from typing import TYPE_CHECKING
 
 import httpx
-from fastapi import FastAPI, status
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
-from od_backend.configure_openai import initialize_openai
+from od_backend.configure_openai import OPENAI_MODEL, initialize_openai
 from od_backend.session_data import (
     SESSION_DB,
+    ChatRequest,
+    ChatResponse,
     UploadFilesRequest,
     add_files_to_vector_store,
     create_vector_store,
@@ -24,6 +26,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from openai import AsyncOpenAI
+    from openai.types.responses import Response
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -104,7 +107,7 @@ async def initialize_vector_store(
 
     Returns
     -------
-    A dict containing the status, session_id, and openai_file_ids.
+    A dict containing the status, session_id, uploaded_file_ids, and vector_store_id.
 
     """
     # Upload files to OpenAI file storage
@@ -125,6 +128,7 @@ async def initialize_vector_store(
     # Commit active tracker state map to database cache
     SESSION_DB[payload.session_id] = {
         "file_ids": uploaded_file_ids,
+        "vector_store_id": vector_store_id,
         "previous_response_id": None,
     }
 
@@ -138,5 +142,74 @@ async def initialize_vector_store(
     return {
         "status": "success",
         "session_id": payload.session_id,
-        "openai_file_ids": uploaded_file_ids,
+        "uploaded_file_ids": uploaded_file_ids,
+        "vector_store_id": vector_store_id,
     }
+
+
+@app.post("/api/v1/chat", response_model=ChatResponse)
+async def chat_turn(payload: ChatRequest) -> ChatResponse:
+    """
+    Process a multi-turn chat request leveraging the active session's context.
+
+    Attributes
+    ----------
+    payload: A ChatRequest containing the session_id and the user's question.
+
+    Returns
+    -------
+    A ChatResponse containing the session_id, answer, and previous_response_id.
+
+    """
+    session: dict[str, list[str] | str | None] | None = SESSION_DB.get(
+        payload.session_id
+    )
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Active session context not found. Call initialization route first.",
+        )
+
+    # Structure payload params dynamically depending on conversation turn depth
+    # See https://developers.openai.com/api/docs/guides/tools-file-search
+    api_kwargs: dict[str, str | list[str] | list[dict[str, int | str | list[str]]]] = {
+        "model": OPENAI_MODEL,
+        "input": payload.question,
+        "tools": [  # type: ignore[dict-item]
+            {
+                "type": "file_search",
+                "vector_store_ids": [session["vector_store_id"]],
+                "max_num_results": 2,
+            },
+        ],
+        "include": ["file_search_call.results"],
+    }
+
+    if session["previous_response_id"] is not None:
+        # Link history natively via the previous ID pointer
+        api_kwargs["previous_response_id"] = session["previous_response_id"]
+
+    try:
+        # Execute asynchronous context completion
+        api_response: Response = await openai_client.responses.create(**api_kwargs)  # type: ignore[call-overload]
+
+        logger.info(
+            "Completed API response ID %s with output %s",
+            api_response.id,
+            api_response.output_text,
+        )
+    except Exception as err:
+        logger.exception("OpenAI execution interrupted")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"OpenAI Execution Interrupted: {err}",
+        ) from err
+
+    # Mutate localized storage pointer reference to match newest message tail
+    session["previous_response_id"] = api_response.id
+
+    return ChatResponse(
+        session_id=payload.session_id,
+        answer=api_response.output_text,
+        previous_response_id=api_response.id,
+    )
