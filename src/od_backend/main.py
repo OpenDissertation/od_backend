@@ -220,7 +220,7 @@ async def chat_turn(payload: ChatRequest) -> ChatResponse:
             {
                 "type": "file_search",
                 "vector_store_ids": [session["vector_store_id"]],
-                "max_num_results": 2,
+                "max_num_results": 5,
             },
         ],
         "include": ["file_search_call.results"],
