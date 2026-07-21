@@ -5,11 +5,18 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+import anyio
 import httpx
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from od_backend.configure_openai import OPENAI_MODEL, initialize_openai
+from od_backend.dissertation_downloads import (
+    DownloadDissertationsRequest,
+    DownloadedDissertation,
+    download_dissertation,
+    normalize_institution,
+)
 from od_backend.session_data import (
     SESSION_DB,
     ChatRequest,
@@ -147,6 +154,38 @@ async def initialize_vector_store(
         "uploaded_file_ids": uploaded_file_ids,
         "vector_store_id": vector_store_id,
     }
+
+
+@app.post("/api/v1/dissertations/download", status_code=status.HTTP_200_OK)
+async def download_dissertations(
+    payload: DownloadDissertationsRequest,
+) -> dict[str, list[DownloadedDissertation]]:
+    """
+    Download one PhD dissertation per requested author to /tmp.
+
+    Attributes
+    ----------
+    payload: A request containing dissertation authors and institutions.
+
+    Returns
+    -------
+    A dict containing one download result per requested author.
+
+    """
+    for dissertation in payload.dissertations:
+        try:
+            normalize_institution(dissertation.institution)
+        except ValueError as err:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"{err} Author: {dissertation.author}",
+            ) from err
+
+    results = [
+        await anyio.to_thread.run_sync(download_dissertation, dissertation)
+        for dissertation in payload.dissertations
+    ]
+    return {"results": results}
 
 
 @app.post("/api/v1/chat", response_model=ChatResponse)

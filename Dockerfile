@@ -28,6 +28,7 @@ COPY src /build/src
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-editable
 
+
 # *** Stage 2: Final runtime ***
 FROM python:3.14.6-slim-trixie
 
@@ -38,7 +39,11 @@ COPY --from=builder /app /app
 
 # Ensure the virtual environment's binaries are preferred in the PATH
 ENV PATH="/app/bin:$PATH" \
+    PLAYWRIGHT_BROWSERS_PATH=/app/ms-playwright \
     PYTHONUNBUFFERED=True
+
+# Install the browser used for Princeton DataSpace downloads.
+RUN playwright install --with-deps chromium
 
 # Set labels
 LABEL org.opencontainers.image.authors="Jeffry Lew"
