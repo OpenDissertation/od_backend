@@ -4,6 +4,7 @@ import pytest
 
 from od_backend.dissertation_downloads import (
     author_matches,
+    is_princeton_verification_page,
     normalize_institution,
     safe_pdf_path,
 )
@@ -36,3 +37,29 @@ def test_safe_pdf_path_uses_tmp_directory() -> None:
     path = safe_pdf_path("Doe, Jane", "unsw", "A Thesis: With Punctuation!")
     assert path.parent == Path("/") / "tmp"
     assert path.name == "od_unsw_Doe_Jane_A_Thesis_With_Punctuation.pdf"
+
+
+def test_is_princeton_verification_page_detects_verify_gate() -> None:
+    html = """
+    <html>
+      <head><title>Security Verification Required</title></head>
+      <body>Please complete verification to continue.</body>
+    </html>
+    """
+
+    assert is_princeton_verification_page(
+        "https://dataspace.princeton.edu/verify", html
+    )
+
+
+def test_is_princeton_verification_page_ignores_normal_search_page() -> None:
+    html = """
+    <html>
+      <head><title>Princeton DataSpace</title></head>
+      <body><table><tr><th>Issue Date</th><th>Title</th><th>Author</th></tr></table></body>
+    </html>
+    """
+
+    assert not is_princeton_verification_page(
+        "https://dataspace.princeton.edu/simple-search?query=Doe", html
+    )

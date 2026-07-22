@@ -1,7 +1,7 @@
 services:
   od_backend:
     build: .
-    command: ["uvicorn", "od_backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    command: ["xvfb-run", "-a", "uvicorn", "od_backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     environment:
       CONFIG_TOML_FILE: /run/secrets/config_toml
     restart: always

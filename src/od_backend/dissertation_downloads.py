@@ -25,7 +25,6 @@ DOWNLOAD_DIRECTORY = Path("/tmp")  # noqa: S108 - downloads are explicitly requi
 MINIMUM_PDF_BYTES = 1000
 HTTP_RETRIES = 3
 PRINCETON_BASE_URL = "https://dataspace.princeton.edu"
-PRINCETON_FULLTEXT_SEARCH_URL = "{base}/simple-search?query={query}&rpp=500"
 PRINCETON_FIELD_SEARCH_URL = (
     "{base}/simple-search?filter_field_1={field}&filter_type_1=contains"
     "&filter_value_1={query}&rpp=500"
@@ -36,6 +35,14 @@ UNSW_THESIS_COLLECTION_UUID = "5ddb1166-7466-4b4a-8b36-8fb9863464e0"
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
+PRINCETON_LOCALE = "en-US"
+PRINCETON_TIMEZONE = "America/New_York"
+PRINCETON_VIEWPORT = {"width": 1366, "height": 768}
+PRINCETON_VERIFICATION_DETAIL = (
+    "Princeton DataSpace security verification is required before this request "
+    "can be parsed. Retry after completing verification in a browser or from "
+    "an allowed network."
 )
 SUPPORTED_INSTITUTIONS = {
     "princeton university": "princeton",
@@ -133,9 +140,28 @@ def build_princeton_search_url(author: str) -> str:
     )
 
 
+
+def is_princeton_verification_page(url: str, html: str) -> bool:
+    """Return whether Princeton DataSpace is blocking with verification."""
+    soup = BeautifulSoup(html, "html.parser")
+    title = soup.title.get_text(" ", strip=True) if soup.title else ""
+    text = soup.get_text(" ", strip=True)
+    return url.rstrip("/").endswith("/verify") or any(
+        phrase in value.casefold()
+        for value in (title, text)
+        for phrase in ("security verification required", "verification required")
+    )
+
+
+def raise_for_princeton_verification(page: Page) -> None:
+    """Raise a clear error if the loaded Princeton page is a verification gate."""
+    if is_princeton_verification_page(page.url, page.content()):
+        raise RuntimeError(PRINCETON_VERIFICATION_DETAIL)
+
 def get_princeton_item_metadata(page: Page, item_url: str) -> dict[str, Any]:
     """Load a Princeton DataSpace item page and extract dissertation metadata."""
     page.goto(item_url, wait_until="networkidle", timeout=30_000)
+    raise_for_princeton_verification(page)
     soup = BeautifulSoup(page.content(), "html.parser")
 
     def meta(name: str) -> list[str]:
@@ -211,20 +237,28 @@ def download_princeton_dissertation(author: str) -> DownloadedDissertation:
     """Search Princeton DataSpace and download the first matching PhD dissertation."""
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(
-            headless=True,
+            headless=False,
             args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
         )
-        context = browser.new_context(user_agent=USER_AGENT, accept_downloads=True)
-        page = context.new_page()
-        page.add_init_script(
+        context = browser.new_context(
+            user_agent=USER_AGENT,
+            accept_downloads=True,
+            locale=PRINCETON_LOCALE,
+            timezone_id=PRINCETON_TIMEZONE,
+            viewport=PRINCETON_VIEWPORT,
+            extra_http_headers={"Accept-Language": "en-US,en;q=0.9"},
+        )
+        context.add_init_script(
             "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
         )
+        page = context.new_page()
         try:
             page.goto(
                 build_princeton_search_url(author),
                 wait_until="networkidle",
                 timeout=30_000,
             )
+            raise_for_princeton_verification(page)
             soup = BeautifulSoup(page.content(), "html.parser")
             results_table = next(
                 (
