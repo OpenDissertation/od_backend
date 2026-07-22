@@ -19,16 +19,14 @@ from pydantic import BaseModel, ConfigDict, Field
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    from bs4.element import Tag
     from playwright.sync_api import Page, Response
 
 DOWNLOAD_DIRECTORY = Path("/tmp")  # noqa: S108 - downloads are explicitly required in container /tmp.
 MINIMUM_PDF_BYTES = 1000
 HTTP_RETRIES = 3
 PRINCETON_BASE_URL = "https://dataspace.princeton.edu"
-PRINCETON_FIELD_SEARCH_URL = (
-    "{base}/simple-search?filter_field_1={field}&filter_type_1=contains"
-    "&filter_value_1={query}&rpp=500"
-)
+PRINCETON_FULLTEXT_SEARCH_URL = "{base}/simple-search?query={query}&rpp=500"
 UNSW_BASE_URL = "https://unsworks.unsw.edu.au"
 UNSW_API_BASE = f"{UNSW_BASE_URL}/server/api"
 UNSW_THESIS_COLLECTION_UUID = "5ddb1166-7466-4b4a-8b36-8fb9863464e0"
@@ -132,10 +130,9 @@ def author_matches(author: str, repository_authors: list[str]) -> bool:
 
 
 def build_princeton_search_url(author: str) -> str:
-    """Build the Princeton DataSpace author search URL."""
-    return PRINCETON_FIELD_SEARCH_URL.format(
+    """Build the Princeton DataSpace full-text search URL."""
+    return PRINCETON_FULLTEXT_SEARCH_URL.format(
         base=PRINCETON_BASE_URL,
-        field="author",
         query=quote(author),
     )
 
@@ -243,6 +240,42 @@ def download_princeton_pdf(
     validate_pdf(dest_path)
 
 
+def find_princeton_results_table(soup: BeautifulSoup) -> Tag | None:
+    """Find the Princeton DataSpace table containing actual search results."""
+    return next(
+        (
+            table
+            for table in soup.find_all("table")
+            if all(
+                label in table.get_text(" ", strip=True)
+                for label in ("Issue Date", "Title", "Author")
+            )
+        ),
+        None,
+    )
+
+
+def load_princeton_search_results(
+    page: Page, author: str
+) -> tuple[BeautifulSoup, Tag | None]:
+    """Load Princeton search results, retrying once for flaky empty pages."""
+    search_url = build_princeton_search_url(author)
+    for attempt in range(2):
+        page.goto(search_url, wait_until="networkidle", timeout=30_000)
+        wait_for_princeton_verification(page)
+        soup = BeautifulSoup(page.content(), "html.parser")
+        results_table = find_princeton_results_table(soup)
+        page_text = soup.get_text(" ", strip=True)
+        no_results = bool(
+            re.search(r"no items? (were )?found|no results", page_text, re.IGNORECASE)
+        )
+        if results_table is not None or no_results or attempt == 1:
+            return soup, results_table
+        page.wait_for_timeout(2_000)
+    msg = "Princeton search results could not be loaded"
+    raise RuntimeError(msg)
+
+
 def download_princeton_dissertation(author: str) -> DownloadedDissertation:
     """Search Princeton DataSpace and download the first matching PhD dissertation."""
     with sync_playwright() as playwright:
@@ -263,30 +296,13 @@ def download_princeton_dissertation(author: str) -> DownloadedDissertation:
         )
         page = context.new_page()
         try:
-            page.goto(
-                build_princeton_search_url(author),
-                wait_until="networkidle",
-                timeout=30_000,
-            )
-            wait_for_princeton_verification(page)
-            soup = BeautifulSoup(page.content(), "html.parser")
-            results_table = next(
-                (
-                    table
-                    for table in soup.find_all("table")
-                    if all(
-                        label in table.get_text(" ", strip=True)
-                        for label in ("Issue Date", "Title", "Author")
-                    )
-                ),
-                None,
-            )
+            _soup, results_table = load_princeton_search_results(page, author)
             if results_table is None:
                 return DownloadedDissertation(
                     author=author,
                     institution="Princeton University",
                     status="not_found",
-                    detail="No Princeton search results table found.",
+                    detail="No Princeton search results found for author",
                 )
             seen: set[str] = set()
             for link in results_table.find_all("a", href=True):
