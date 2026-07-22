@@ -39,10 +39,10 @@ USER_AGENT = (
 PRINCETON_LOCALE = "en-US"
 PRINCETON_TIMEZONE = "America/New_York"
 PRINCETON_VIEWPORT = {"width": 1366, "height": 768}
+PRINCETON_VERIFICATION_TIMEOUT_MS = 20_000
 PRINCETON_VERIFICATION_DETAIL = (
-    "Princeton DataSpace security verification is required before this request "
-    "can be parsed. Retry after completing verification in a browser or from "
-    "an allowed network."
+    "Princeton DataSpace security verification did not complete before this "
+    "request timed out. Retry from an allowed network"
 )
 SUPPORTED_INSTITUTIONS = {
     "princeton university": "princeton",
@@ -140,28 +140,38 @@ def build_princeton_search_url(author: str) -> str:
     )
 
 
-
 def is_princeton_verification_page(url: str, html: str) -> bool:
-    """Return whether Princeton DataSpace is blocking with verification."""
+    """Return whether Princeton DataSpace is showing its verification gate."""
     soup = BeautifulSoup(html, "html.parser")
-    title = soup.title.get_text(" ", strip=True) if soup.title else ""
-    text = soup.get_text(" ", strip=True)
-    return url.rstrip("/").endswith("/verify") or any(
-        phrase in value.casefold()
-        for value in (title, text)
-        for phrase in ("security verification required", "verification required")
+    title = soup.title.get_text(" ", strip=True).casefold() if soup.title else ""
+    return url.rstrip("/").endswith("/verify") or title == (
+        "security verification required"
     )
 
 
-def raise_for_princeton_verification(page: Page) -> None:
-    """Raise a clear error if the loaded Princeton page is a verification gate."""
+def wait_for_princeton_verification(page: Page) -> None:
+    """Allow Princeton DataSpace's browser verification page to finish."""
+    if not is_princeton_verification_page(page.url, page.content()):
+        return
+    try:
+        page.wait_for_function(
+            """() => (
+                !window.location.pathname.endsWith('/verify')
+                && document.title.trim().toLowerCase() !== 'security verification required'
+            )""",
+            timeout=PRINCETON_VERIFICATION_TIMEOUT_MS,
+        )
+    except PlaywrightTimeoutError as err:
+        raise RuntimeError(PRINCETON_VERIFICATION_DETAIL) from err
+    page.wait_for_load_state("networkidle", timeout=30_000)
     if is_princeton_verification_page(page.url, page.content()):
         raise RuntimeError(PRINCETON_VERIFICATION_DETAIL)
+
 
 def get_princeton_item_metadata(page: Page, item_url: str) -> dict[str, Any]:
     """Load a Princeton DataSpace item page and extract dissertation metadata."""
     page.goto(item_url, wait_until="networkidle", timeout=30_000)
-    raise_for_princeton_verification(page)
+    wait_for_princeton_verification(page)
     soup = BeautifulSoup(page.content(), "html.parser")
 
     def meta(name: str) -> list[str]:
@@ -258,7 +268,7 @@ def download_princeton_dissertation(author: str) -> DownloadedDissertation:
                 wait_until="networkidle",
                 timeout=30_000,
             )
-            raise_for_princeton_verification(page)
+            wait_for_princeton_verification(page)
             soup = BeautifulSoup(page.content(), "html.parser")
             results_table = next(
                 (

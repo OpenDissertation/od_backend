@@ -52,6 +52,13 @@ def test_is_princeton_verification_page_detects_verify_gate() -> None:
     )
 
 
+def test_is_princeton_verification_page_detects_verify_url_without_title() -> None:
+    assert is_princeton_verification_page(
+        "https://dataspace.princeton.edu/verify",
+        "<html><head><title>Princeton DataSpace</title></head></html>",
+    )
+
+
 def test_is_princeton_verification_page_ignores_normal_search_page() -> None:
     html = """
     <html>
