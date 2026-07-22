@@ -1,9 +1,13 @@
 from pathlib import Path
 
 import pytest
+from bs4 import BeautifulSoup
 
 from od_backend.dissertation_downloads import (
     author_matches,
+    build_princeton_search_url,
+    find_princeton_results_table,
+    is_princeton_verification_page,
     normalize_institution,
     safe_pdf_path,
 )
@@ -36,3 +40,62 @@ def test_safe_pdf_path_uses_tmp_directory() -> None:
     path = safe_pdf_path("Doe, Jane", "unsw", "A Thesis: With Punctuation!")
     assert path.parent == Path("/") / "tmp"
     assert path.name == "od_unsw_Doe_Jane_A_Thesis_With_Punctuation.pdf"
+
+
+def test_is_princeton_verification_page_detects_verify_gate() -> None:
+    html = """
+    <html>
+      <head><title>Security Verification Required</title></head>
+      <body>Please complete verification to continue.</body>
+    </html>
+    """
+
+    assert is_princeton_verification_page(
+        "https://dataspace.princeton.edu/verify", html
+    )
+
+
+def test_is_princeton_verification_page_detects_verify_url_without_title() -> None:
+    assert is_princeton_verification_page(
+        "https://dataspace.princeton.edu/verify",
+        "<html><head><title>Princeton DataSpace</title></head></html>",
+    )
+
+
+def test_is_princeton_verification_page_ignores_normal_search_page() -> None:
+    html = """
+    <html>
+      <head><title>Princeton DataSpace</title></head>
+      <body><table><tr><th>Issue Date</th><th>Title</th><th>Author</th></tr></table></body>
+    </html>
+    """
+
+    assert not is_princeton_verification_page(
+        "https://dataspace.princeton.edu/simple-search?query=Doe", html
+    )
+
+
+def test_build_princeton_search_url_uses_fulltext_search() -> None:
+    assert build_princeton_search_url("Doe, Jane") == (
+        "https://dataspace.princeton.edu/simple-search?query=Doe%2C%20Jane&rpp=500"
+    )
+
+
+def test_find_princeton_results_table_ignores_navigation_handle_links() -> None:
+    soup = BeautifulSoup(
+        """
+        <html><body>
+          <table><tr><td><a href="/handle/88435/dsp0123456789">Collection</a></td></tr></table>
+          <table>
+            <tr><th>Issue Date</th><th>Title</th><th>Author(s)</th></tr>
+            <tr><td>2020</td><td><a href="/handle/88435/dsp0abcde1234">Thesis</a></td><td>Doe</td></tr>
+          </table>
+        </body></html>
+        """,
+        "html.parser",
+    )
+
+    table = find_princeton_results_table(soup)
+
+    assert table is not None
+    assert "Thesis" in table.get_text(" ", strip=True)
