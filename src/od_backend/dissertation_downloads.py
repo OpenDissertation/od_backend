@@ -13,7 +13,7 @@ import httpx
 from bs4 import BeautifulSoup
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import ViewportSize, sync_playwright
 from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
@@ -288,7 +288,7 @@ def download_princeton_dissertation(author: str) -> DownloadedDissertation:
             accept_downloads=True,
             locale=PRINCETON_LOCALE,
             timezone_id=PRINCETON_TIMEZONE,
-            viewport=PRINCETON_VIEWPORT,
+            viewport=cast("ViewportSize", PRINCETON_VIEWPORT),
             extra_http_headers={"Accept-Language": "en-US,en;q=0.9"},
         )
         context.add_init_script(
