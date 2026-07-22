@@ -38,12 +38,18 @@ WORKDIR /app
 COPY --from=builder /app /app
 
 # Ensure the virtual environment's binaries are preferred in the PATH
+# DEBIAN_FRONTEND prevents pausing the build to ask geographical/timezone questions
 ENV PATH="/app/bin:$PATH" \
     PLAYWRIGHT_BROWSERS_PATH=/app/ms-playwright \
-    PYTHONUNBUFFERED=True
+    PYTHONUNBUFFERED=True \
+    DEBIAN_FRONTEND=noninteractive
 
-# Install the browser used for Princeton DataSpace downloads.
-RUN playwright install --with-deps chromium
+# Install xvfb and the browser used for Princeton DataSpace downloads.
+RUN apt-get update \
+    && apt-get install -y \
+    xvfb \
+    && rm -rf /var/lib/apt/lists/* \
+    && playwright install --with-deps chromium
 
 # Set labels
 LABEL org.opencontainers.image.authors="Jeffry Lew"
@@ -53,6 +59,6 @@ LABEL org.opencontainers.image.source="https://github.com/OpenDissertation/od_ba
 LABEL org.opencontainers.image.title="backend"
 LABEL org.opencontainers.image.vendor="OpenDissertation"
 
-LABEL org.opencontainers.image.version="0.2.0"
+LABEL org.opencontainers.image.version="0.3.0"
 
 CMD ["sh", "-c", "xvfb-run -a uvicorn od_backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
